@@ -1,7 +1,7 @@
-"""TinyDES 8 bit, 3 vòng; các bảng giữ đúng BTL ATBMTT.py."""
+# TinyDES: khối 8 bit, khóa 8 bit, 3 vòng Feistel
 from .bits import validate_bits, validate_subkeys
 
-# ================== CÁC HÀM TIỆN ÍCH XỬ LÝ BIT ==================
+# hàm xử lý bit
 
 def to_bit_list(bit_str):
     if not bit_str or any(b not in "01" for b in bit_str):
@@ -20,35 +20,23 @@ def xor_bits(a, b):
         raise ValueError("Hai dãy bit XOR phải cùng độ dài.")
     return [x ^ y for x, y in zip(a, b)]
 
-# ================== HÀM EXPAND, S-BOX, P-BOX (BÁM CÁCH LÀM SLIDE) ==================
+# Expand, S-box, P-box
 
 def expand_4_to_6(R4):
-    """
-    Expand: 4 bit -> 6 bit.
-    Gọi R4 = [b0, b1, b2, b3].
-    Slide mô tả kiểu 'hoán vị + mở rộng', ở đây lấy: E(R) = b2 b3 b1 b2 b3 b0.
-    Bảng được giữ đúng theo file BTL ATBMTT.py người dùng cung cấp.
-    """
+    # mở rộng 4 -> 6 bit: b2 b3 b1 b2 b3 b0
     b0, b1, b2, b3 = R4
     return [b2, b3, b1, b2, b3, b0]
 
-# S-box: 6 bit -> 4 bit, dùng bảng 4x16.
-# Dùng bảng S1 của DES (chuẩn, cùng cấu trúc 4 hàng x 16 cột).
+# S-box 4 hàng x 16 cột (lấy S1 của DES)
 SBOX = [
-    [14, 4, 13, 1,  2,15,11, 8,  3,10, 6,12,  5, 9, 0, 7],
-    [ 0,15, 7, 4, 14, 2,13, 1, 10, 6,12,11,  9, 5, 3, 8],
-    [ 4, 1,14, 8, 13, 6, 2,11, 15,12, 9, 7,  3,10, 5, 0],
-    [15,12, 8, 2,  4, 9, 1, 7,  5,11, 3,14, 10, 0, 6,13],
+    [14,  4, 13,  1,  2, 15, 11,  8,  3, 10,  6, 12,  5,  9,  0,  7],
+    [ 0, 15,  7,  4, 14,  2, 13,  1, 10,  6, 12, 11,  9,  5,  3,  8],
+    [ 4,  1, 14,  8, 13,  6,  2, 11, 15, 12,  9,  7,  3, 10,  5,  0],
+    [15, 12,  8,  2,  4,  9,  1,  7,  5, 11,  3, 14, 10,  0,  6, 13],
 ]
 
 def sbox_6_to_4(X6):
-    """
-    X6 = [b0,b1,b2,b3,b4,b5].
-    Theo cách đọc S-box trên slide:
-      - Hàng (row) = b0 b5 (2 bit)
-      - Cột (col) = b1 b2 b3 b4 (4 bit).
-    Lấy giá trị thập phân trong SBOX, đổi sang 4 bit nhị phân.
-    """
+    # hàng = b0 b5, cột = b1 b2 b3 b4
     b0,b1,b2,b3,b4,b5 = X6
     row = (b0 << 1) | b5
     col = (b1 << 3) | (b2 << 2) | (b3 << 1) | b4
@@ -61,35 +49,19 @@ def sbox_6_to_4(X6):
     ]
 
 def pbox_4(bits4):
-    """
-    P-box: hoán vị 4 bit đầu vào.
-    Slide ghi 'P-box thực hiện hoán vị 4 bit', ở đây chọn:
-        P(b0,b1,b2,b3) = b2 b0 b3 b1
-    Giữ nguyên bảng hoán vị của BTL ATBMTT.py.
-    """
+    # hoán vị 4 bit: b2 b0 b3 b1
     b0,b1,b2,b3 = bits4
     return [b2, b0, b3, b1]
 
-# ================== SINH KHÓA CON TINYDES (3 VÒNG, K_i 6-BIT) ==================
+# sinh khóa con
 
 def compress_8_to_6(K8):
-    """
-    Hàm nén khóa: 8 bit -> 6 bit.
-    Slide nói: 'hoán vị và nén 8 bit KL_i||KR_i thành 6 bit k_j'.
-    Ở đây chọn thứ tự: K_i = [k5, k2, k6, k3, k1, k0]
-    (chỉ là hoán vị + bỏ bớt 2 bit, đúng 'cách làm' compress).
-    """
+    # nén 8 -> 6 bit: k5 k2 k6 k3 k1 k0 (bỏ k4, k7)
     k0,k1,k2,k3,k4,k5,k6,k7 = K8
     return [k5, k2, k6, k3, k1, k0]
 
 def generate_subkeys_from_key(K8_str):
-    """
-    Sinh 3 khóa con K1,K2,K3 từ khóa chính 8 bit, đúng mô tả trên slide:
-      - Chia K thành KL0, KR0 (mỗi nửa 4 bit)
-      - Vòng 1: KL1 = LS1(KL0), KR1 = LS1(KR0)      -> K1 = Compress(KL1||KR1)
-      - Vòng 2: KL2 = LS2(KL1), KR2 = LS2(KR1)      -> K2 = Compress(KL2||KR2)
-      - Vòng 3: KL3 = LS1(KL2), KR3 = LS1(KR2)      -> K3 = Compress(KL3||KR3)
-    """
+    # tách khóa thành KL, KR; dịch trái 1, 2, 1 bit rồi nén ra K1, K2, K3
     log = []
     validate_bits(K8_str, 8, "Khóa TinyDES")
     K8 = to_bit_list(K8_str)
@@ -100,7 +72,7 @@ def generate_subkeys_from_key(K8_str):
     log.append(f"Chia khóa: KL0 = {to_bit_str(KL)}, KR0 = {to_bit_str(KR)}")
 
     subkeys = []
-    # Dịch trái: vòng 1 (1 bit), vòng 2 (2 bit), vòng 3 (1 bit) – đúng bullet trong slide
+    # số bit dịch của 3 vòng
     shifts = [1, 2, 1]
 
     for round_idx, sh in enumerate(shifts, start=1):
@@ -115,42 +87,35 @@ def generate_subkeys_from_key(K8_str):
 
     return subkeys, log
 
-# ================== HÀM F(R, K_i) ==================
+# hàm F
 
 def F_function(R4, Ki6, round_index, log):
-    """
-    Hàm F(R, K_i) đúng cấu trúc:
-      Expand 4 -> 6 → XOR với K_i → S-box (6 -> 4) → P-box (4 -> 4).
-    """
+    # Expand -> xor khóa -> S-box -> P-box
     log.append(f"  Đầu vào F = {to_bit_str(R4)}")
 
-    # 1. Expand
+    # bước 1: Expand
     E = expand_4_to_6(R4)
     log.append(f"  Expand(đầu vào) = {to_bit_str(E)}")
 
-    # 2. XOR với K_i (6 bit)
+    # bước 2: xor với khóa con
     X = xor_bits(E, Ki6)
     log.append(f"  XOR với K_{round_index} = {to_bit_str(Ki6)} -> {to_bit_str(X)}")
 
-    # 3. S-box: 6 -> 4
+    # bước 3: S-box
     S_out = sbox_6_to_4(X)
     log.append(f"  S-box({to_bit_str(X)}) = {to_bit_str(S_out)}")
 
-    # 4. P-box: 4 -> 4
+    # bước 4: P-box
     P_out = pbox_4(S_out)
     log.append(f"  P-box({to_bit_str(S_out)}) = {to_bit_str(P_out)} (F_{round_index})")
 
     return P_out
 
-# ================== MÃ HÓA & GIẢI MÃ 8-BIT (3 VÒNG FEISTEL) ==================
+# mã hóa / giải mã
 
 def tinyDES_encrypt_block(P8_str, subkeys):
-    """
-    Mã hóa 1 block 8-bit với TinyDES (3 vòng Feistel).
-    - Không dùng IP; chỉ chia P thành L0 (4 bit đầu) và R0 (4 bit cuối).
-    - Vòng i: L_i = R_{i-1}, R_i = L_{i-1} XOR F(R_{i-1}, K_i)
-    - Bản mã C = L3 || R3
-    """
+    # không có IP và không đổi chỗ cuối
+    # vòng i: L_i = R_(i-1), R_i = L_(i-1) xor F(R_(i-1), K_i); C = L3 || R3
     log = []
     validate_bits(P8_str, 8, "Bản rõ TinyDES")
     validate_subkeys(subkeys, 3, 6)
@@ -177,17 +142,8 @@ def tinyDES_encrypt_block(P8_str, subkeys):
     return to_bit_str(C8), log
 
 def tinyDES_decrypt_block(C8_str, subkeys):
-    """
-    Giải mã TinyDES.
-    Vì ta không dùng final swap, nên giải mã không dùng cùng hàm encrypt,
-    mà dùng công thức nghịch của Feistel:
-
-      Từ (L_i, R_i) -> (L_{i-1}, R_{i-1}):
-        R_{i-1} = L_i
-        L_{i-1} = R_i XOR F(R_{i-1}, K_i) = R_i XOR F(L_i, K_i)
-
-    Ta đi ngược từ vòng 3 → 1, với K3, K2, K1.
-    """
+    # không đổi chỗ cuối nên giải mã đi ngược từng vòng, dùng K3, K2, K1
+    # R_(i-1) = L_i, L_(i-1) = R_i xor F(L_i, K_i)
     log = []
     validate_bits(C8_str, 8, "Bản mã TinyDES")
     validate_subkeys(subkeys, 3, 6)
@@ -198,16 +154,12 @@ def tinyDES_decrypt_block(C8_str, subkeys):
     R = C8[4:]
     log.append(f"Chia bản mã: L3 = {to_bit_str(L)}, R3 = {to_bit_str(R)}")
 
-    # Đi ngược: K3, K2, K1
     for i, Ki in enumerate(reversed(subkeys), start=1):
         log.append(f"\n--- Vòng giải mã {i} (dùng K_{3 - i + 1}) ---")
-        # R_prev = L_i
         R_prev = L
-        # F(L_i, K_i)
         k = 4 - i
         log.append(f"  Tính F(L{k}, K{k}) với L{k}={to_bit_str(R_prev)}")
         F_out = F_function(R_prev, Ki, k, log)
-        # L_prev = R_i XOR F(L_i, K_i)
         L_prev = xor_bits(R, F_out)
         log.append(f"  L{k-1} = R{k} XOR F(L{k}, K{k}) = {to_bit_str(L_prev)}")
         log.append(f"  R{k-1} = L{k} = {to_bit_str(R_prev)}")
@@ -218,4 +170,3 @@ def tinyDES_decrypt_block(C8_str, subkeys):
     log.append(f"Plaintext P (giải mã) = {to_bit_str(P8)}")
 
     return to_bit_str(P8), log
-
