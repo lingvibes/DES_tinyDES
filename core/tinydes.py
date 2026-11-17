@@ -25,7 +25,7 @@ def xor_bits(a, b):
 def expand_4_to_6(R4):
     # mở rộng 4 -> 6 bit: b2 b3 b1 b2 b3 b0
     b0, b1, b2, b3 = R4
-    return [b2, b3, b1, b2, b3, b0]
+    return [b2, b3, b1, b2, b1, b0]
 
 # S-box 4 hàng x 16 cột (lấy S1 của DES)
 SBOX = [
