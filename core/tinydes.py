@@ -58,7 +58,7 @@ def pbox_4(bits4):
 def compress_8_to_6(K8):
     # nén 8 -> 6 bit: k5 k2 k6 k3 k1 k0 (bỏ k4, k7)
     k0,k1,k2,k3,k4,k5,k6,k7 = K8
-    return [k5, k2, k6, k3, k1, k0]
+    return [k5, k1, k3, k2, k7, k0]
 
 def generate_subkeys_from_key(K8_str):
     # tách khóa thành KL, KR; dịch trái 1, 2, 1 bit rồi nén ra K1, K2, K3
